@@ -1,11 +1,9 @@
 {
-  "name": "docker-demo",
+  "name": "rancher-demo",
   "version": "0.0.1",
   "description": "",
-  "main": "webpack.config.js",
   "dependencies": {
-    "semantic-ui": "2.2.13"
+    "fomantic-ui": "^2.8.7"
   },
-  "author": "ehazlett",
   "license": ""
 }

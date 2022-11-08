@@ -1,6 +1,11 @@
-module github.com/ehazlett/docker-demo
+module app
+
+go 1.19
+
+require github.com/urfave/cli v1.22.10
 
 require (
-	github.com/dustin/go-humanize v0.0.0-20180713052910-9f541cc9db5d
-	github.com/urfave/cli v0.0.0-20170926034118-ac249472b7de
+	github.com/cpuguy83/go-md2man/v2 v2.0.0-20190314233015-f79a8a8ca69d // indirect
+	github.com/russross/blackfriday/v2 v2.0.1 // indirect
+	github.com/shurcooL/sanitized_anchor_name v1.0.0 // indirect
 )
