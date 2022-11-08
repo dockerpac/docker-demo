@@ -17,7 +17,7 @@ WORKDIR /go/src/app
 ENV GO111MODULE=on
 RUN go build -a -v -tags 'netgo' -ldflags '-w -linkmode external -extldflags -static' -o docker-demo .
 
-FROM alpine:latest
+FROM alpine:3.6
 RUN apk add -U --no-cache curl
 RUN adduser -D myuser
 COPY --chown=myuser:myuser static /home/myuser/static
