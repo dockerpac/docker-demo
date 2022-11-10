@@ -1,6 +1,6 @@
 FROM node:16 as ui
-WORKDIR /usr/src/app
-COPY . /usr/src/app
+COPY ui /usr/src/app/ui
+COPY templates /usr/src/app/templates
 WORKDIR /usr/src/app/ui
 RUN npm install
 WORKDIR /usr/src/app
@@ -12,12 +12,14 @@ RUN npx gulp build
 
 FROM golang:1.19-alpine as app
 RUN apk add -U build-base git
-COPY . /go/src/app
+COPY go.* /go/src/app/
+COPY *.go /go/src/app/
+COPY vendor /go/src/app/
 WORKDIR /go/src/app
 ENV GO111MODULE=on
 RUN go build -a -v -tags 'netgo' -ldflags '-w -linkmode external -extldflags -static' -o docker-demo .
 
-FROM alpine:3.6
+FROM alpine:3
 RUN apk add -U --no-cache curl
 RUN adduser -D myuser
 COPY --chown=myuser:myuser static /home/myuser/static

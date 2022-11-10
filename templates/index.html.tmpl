@@ -14,9 +14,17 @@
 
         <script type="text/javascript">
             var containers = [];
+            var lastSeen = {};
             var colors = new Object;
+            var refreshInterval = Number({{ .RefreshInterval }});
 
-            function getColor() {
+            function getPetsAsset(pets) {
+                var asset;
+				asset = "static/img/container.png"
+				return asset;
+			}
+
+            function getColor(contColor) {
                 var allColors = [
                     "red",
                     "orange",
@@ -30,11 +38,20 @@
                     "pink"
                 ]
 
-                return allColors[Math.floor(Math.random()*allColors.length)];
+                color = allColors[Math.floor(Math.random()*allColors.length)];
+
+                if (color != contColor) {
+                    return color;
+                } else {
+                    return getColor(contColor);
+                }
             }
 
             function reload() {
                 var ts = new Date().getTime();
+                var expireInterval = Number({{ .ExpireInterval }});
+                var removeInterval = Number({{ .RemoveInterval }});
+
                 $.ajax({
                      url: "/ping?" + ts,
                      dataType: "json",
@@ -48,24 +65,56 @@
                      },
                      success: function(data){
                          if (! (colors.hasOwnProperty(data.version))) {
-                             colors[data.version] = getColor();
+                             colors[data.version] = getColor(data.contColor);
                          }
                          var color = colors[data.version];
                          if ($.inArray(data.instance, containers) == -1) {
                              containers.push(data.instance);
                          }
 
+                         var contColor = data.contColor;
+						 var petsAsset = getPetsAsset(data.pets);
+
+                         // add timestamp for when we last saw this container
+                         lastSeen[data.instance] = ts;
+
                          for (var i=0; i<containers.length; i++) {
                             var instanceName = containers[i];
                             var el = $("#instance-" + instanceName);
                             if (el.length == 0) {
                                 console.log("creating instance " + instanceName);
-                                var elData = '<div id="instance-' + instanceName + '" class="ui card container-instance"><div class="image"><img width="25%" height="25%" src="static/img/container.png"></div><div class="content centered view-computer"><div> {{ if .ShowVersion }}<div class="ui top left attached ' + color + ' label">' + data.version +'</div>{{ end }} <div id="instance-label-' + instanceName + '"class="ui top right attached green serving label">serving</div>' + instanceName + '</div></div></div>';
+
+                                // create a shorter display name for the tile
+                                var displayName = instanceName.match(/.+-(\w+)$/);
+                                if (!displayName) {
+                                    displayName = instanceName;
+                                } else {
+                                  displayName = displayName[1];
+                                }
+                                var elData = '<div id="instance-' + instanceName + '" class="card container-instance"><div class="image" id="replica" style="background-color: ' + contColor + ';"><img width="25%" height="25%" src="' + petsAsset + '"></div><div class="content centered view-computer"><div> {{ if .ShowVersion }}<div class="ui top left attached ' + color + ' label">' + data.version +'</div>{{ end }} <div id="instance-label-' + instanceName + '"class="ui top right attached green serving label">serving</div>' + displayName + '</div></div></div>';
 
                                 $("div.container-group").append(elData);
                                 el = $("#instance-" + instanceName);
                             }
 
+                            if (ts - lastSeen[instanceName] > refreshInterval) {
+                                // expire old instances
+                                var opacity = (1 - (ts - lastSeen[instanceName]) / 1000 / expireInterval).toFixed(2);
+
+                                if ((ts - lastSeen[instanceName]) / 1000 > expireInterval + removeInterval) {
+                                    console.log("removing instance " + instanceName);
+                                    el.remove();
+                                    containers.splice(i, 1);
+                                    delete lastSeen[instanceName];
+                                } else if (opacity >= 0.2) {
+                                    $("#instance-" + instanceName).css('opacity', opacity);
+                                }
+                            } else {
+                                // clear any previously-set opacity
+                                $("#instance-" + instanceName).css('opacity', '');
+                            }
+
+                            // show which replica is active
                             var lbl = $("#instance-label-" + instanceName);
                             if (instanceName == data.instance) {
                                 $(lbl).fadeIn(250);
@@ -76,9 +125,9 @@
 
                          $("#container-count").text(containers.length);
                          if (containers.length > 1) {
-                             $("#container-count-label").text("containers");
+                             $("#container-count-label").text("replicas");
                          } else {
-                             $("#container-count-label").text("container");
+                             $("#container-count-label").text("replica");
                          }
 
                          $("#current-container").text(data.instance);
@@ -92,7 +141,7 @@
                 });
             }
 
-            setInterval(reload, {{ .RefreshInterval }});
+            setInterval(reload, refreshInterval);
         </script>
     </head>
     <body>
@@ -101,11 +150,8 @@
                 <div class="ui container">
                     <img class="logo center" src="static/img/moby.svg"/>
 
-                    {{if ne .Title ""}}
-                    <div class="row centered title">
-                        <h1 class="ui header">{{ .Title }}</h1>
-                    </div>
-                    {{end}}
+
+
 
                     <div class="row centered">
                         <div class="ui huge statistic">

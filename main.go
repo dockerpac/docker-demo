@@ -12,7 +12,7 @@ import (
 	"sync"
 	"time"
 
-        "github.com/urfave/cli"
+	"github.com/urfave/cli"
 )
 
 var (
@@ -29,9 +29,13 @@ type (
 		Version         string
 		Hostname        string
 		RefreshInterval string
+		ExpireInterval  string
 		Metadata        string
 		SkipErrors      bool
 		ShowVersion     bool
+		ContColor       string
+		Pets            string
+		RemoveInterval  string
 	}
 
 	Ping struct {
@@ -39,6 +43,8 @@ type (
 		Version   string `json:"version"`
 		Metadata  string `json:"metadata,omitempty"`
 		RequestID string `json:"request_id,omitempty"`
+		ContColor string `json:"contColor"`
+		Pets      string `json:"pets"`
 	}
 
 	Info struct {
@@ -110,9 +116,20 @@ func index(w http.ResponseWriter, r *http.Request) {
 	title := os.Getenv("TITLE")
 
 	hostname := getHostname()
+
 	refreshInterval := os.Getenv("REFRESH_INTERVAL")
 	if refreshInterval == "" {
 		refreshInterval = "1000"
+	}
+
+	expireInterval := os.Getenv("EXPIRE_INTERVAL")
+	if expireInterval == "" {
+		expireInterval = "10"
+	}
+
+	removeInterval := os.Getenv("REMOVE_INTERVAL")
+	if removeInterval == "" {
+		removeInterval = "20"
 	}
 
 	cnt := &Content{
@@ -120,6 +137,8 @@ func index(w http.ResponseWriter, r *http.Request) {
 		Version:         getVersion(),
 		Hostname:        hostname,
 		RefreshInterval: refreshInterval,
+		ExpireInterval:  expireInterval,
+		RemoveInterval:  removeInterval,
 		Metadata:        getMetadata(),
 		SkipErrors:      os.Getenv("SKIP_ERRORS") != "",
 		ShowVersion:     os.Getenv("SHOW_VERSION") != "",
@@ -148,6 +167,51 @@ func info(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
+func load(w http.ResponseWriter, r *http.Request) {
+	waitGroup.Add(1)
+	defer waitGroup.Done()
+
+	// add a false delay
+	time.Sleep(2 * time.Second)
+
+	w.Header().Set("Connection", "close")
+
+	i, err := getInfo()
+	if err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+
+	enc := json.NewEncoder(w)
+	enc.SetIndent("", "  ")
+	if err := enc.Encode(i); err != nil {
+		http.Error(w, err.Error(), http.StatusInternalServerError)
+		return
+	}
+}
+
+func fail(w http.ResponseWriter, r *http.Request) {
+	waitGroup.Add(1)
+	defer waitGroup.Done()
+
+	// add a false delay
+	time.Sleep(2 * time.Second)
+
+	w.Header().Set("Connection", "close")
+	w.WriteHeader(http.StatusInternalServerError)
+}
+
+func missing(w http.ResponseWriter, r *http.Request) {
+	waitGroup.Add(1)
+	defer waitGroup.Done()
+
+	// add a false delay
+	time.Sleep(2 * time.Second)
+
+	w.Header().Set("Connection", "close")
+	w.WriteHeader(http.StatusNotFound)
+}
+
 func ping(w http.ResponseWriter, r *http.Request) {
 	waitGroup.Add(1)
 	defer waitGroup.Done()
@@ -155,10 +219,23 @@ func ping(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Connection", "close")
 
 	hostname := getHostname()
+
+	contColor := os.Getenv("CONTAINER_COLOR")
+	if contColor == "" {
+		contColor = "black"
+	}
+
+	pets := os.Getenv("PETS")
+	if pets == "" {
+		pets = "cows"
+	}
+
 	p := Ping{
-		Instance: hostname,
-		Version:  getVersion(),
-		Metadata: getMetadata(),
+		Instance:  hostname,
+		Version:   getVersion(),
+		Metadata:  getMetadata(),
+		ContColor: contColor,
+		Pets:      pets,
 	}
 
 	requestID := r.Header.Get("X-Request-Id")
@@ -225,6 +302,9 @@ func main() {
 		mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.Dir("./static"))))
 		mux.Handle("/ping", counter(http.HandlerFunc(ping)))
 		mux.Handle("/info", counter(http.HandlerFunc(info)))
+		mux.Handle("/load", counter(http.HandlerFunc(load)))
+		mux.Handle("/fail", counter(http.HandlerFunc(fail)))
+		mux.Handle("/404", counter(http.HandlerFunc(missing)))
 		mux.Handle("/", counter(http.HandlerFunc(index)))
 
 		hostname := getHostname()
