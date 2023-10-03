@@ -1,4 +1,4 @@
-FROM node:16 as ui
+FROM node:20 as ui
 WORKDIR /usr/src/app
 COPY . /usr/src/app
 WORKDIR /usr/src/app/ui
@@ -10,14 +10,14 @@ RUN mkdir -p ui/semantic/src/themes/app && \
 WORKDIR /usr/src/app/ui/semantic
 RUN npx gulp build
 
-FROM golang:1.19-alpine as app
+FROM golang:1.21-alpine as app
 RUN apk add -U build-base git
 COPY . /go/src/app
 WORKDIR /go/src/app
 ENV GO111MODULE=on
 RUN go build -a -v -tags 'netgo' -ldflags '-w -linkmode external -extldflags -static' -o docker-demo .
 
-FROM alpine:3.6
+FROM alpine:3.18
 RUN apk add -U --no-cache curl
 RUN adduser -D myuser
 COPY --chown=myuser:myuser static /home/myuser/static
